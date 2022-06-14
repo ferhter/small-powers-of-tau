@@ -1,8 +1,17 @@
+
+#[macro_use]
 use ark_bls12_381::{Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
 use ark_ff::{Field, PrimeField, Zero};
 
-use crate::{keypair::PrivateKey, update_proof::UpdateProof};
+use crate::{keypair::PrivateKey, update_proof::UpdateProof, serialisation::SubgroupCheck};
+
+use rand::thread_rng;
+
+use js_sys;
+use web_sys;
+use console_error_panic_hook;
+use wasm_bindgen::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct Accumulator {
@@ -14,7 +23,13 @@ pub struct Parameters {
     pub num_g1_elements_needed: usize,
     pub num_g2_elements_needed: usize,
 }
+
+macro_rules! log {
+            ($($t:tt)*) => (web_sys::console::log_1(&format_args!($($t)*).to_string().into()))
+}
+
 impl Accumulator {
+
     // Creates a powers of tau ceremony.
     // This is not compatible with the BGM17 Groth16 powers of tau ceremony (notice there is no \alpha, \beta)
     pub fn new(parameters: Parameters) -> Accumulator {
@@ -187,6 +202,29 @@ fn vandemonde_challenge(x: Fr, n: usize) -> Vec<Fr> {
         challenges.push(challenges[i] * x);
     }
     challenges
+}
+
+// Javascript entry point
+#[wasm_bindgen]
+pub fn contribute(points: Vec<u8>, g1_size: usize, g2_size: usize) -> Result<Vec<u8>, JsValue> {
+    log!("Init contribute");
+
+    // Put the JS parmeters into an Accumulator
+    let params = Parameters {
+            num_g1_elements_needed: g1_size,
+            num_g2_elements_needed: g2_size,
+    };
+
+    let mut accumulator: Accumulator = Accumulator::deserialise(&points, params, SubgroupCheck::Partial);
+
+    let mut rng = &mut thread_rng();
+    let priv_key = PrivateKey::rand(rng);
+
+    let update_proof: UpdateProof = accumulator.update(priv_key);
+
+    let mut update_bytes: Vec<u8> = accumulator.serialise();
+
+    Ok(update_bytes)
 }
 
 #[test]
