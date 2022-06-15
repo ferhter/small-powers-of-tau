@@ -1,6 +1,6 @@
 [package]
 name = "small-powers-of-tau"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 authors = ["Kevaundray Wedderburn"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -13,6 +13,7 @@ crate-type = ["cdylib", "lib"]
 rand_core = { version = "0.6.3", features = ["getrandom"] }
 rand_chacha = { version = "0.3.1" }
 rand = { version = "0.8.4" }
+getrandom = { version = "0.2", features = ["js"] }
 rayon = "1.0"
 itertools = "0.10.1"
 sha2 = "0.10.2"
@@ -25,7 +26,7 @@ ark-std = "^0.3.0"
 zeroize = { version = "*", features = ["zeroize_derive"] }
 
 # wasm
-wasm-bindgen = { version = "0.2.58" }
+wasm-bindgen = { version = "0.2.69" }
 js-sys = { version = "0.3.35" }
 web-sys = { version = "0.3.35", features = ["console"] }
 console_error_panic_hook = { version = "0.1.6" }
