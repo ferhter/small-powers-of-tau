@@ -8,6 +8,15 @@ use ark_ff::Zero;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
+// macro_rules! log {
+//     ($($t:tt)*) => (web_sys::console::log_1(&format_args!($($t)*).to_string().into()))
+// }
+
+// use js_sys;
+// use web_sys;
+// use console_error_panic_hook;
+
+
 // TODO: Once we specify how to deal with failure cases, make these methods return a Result
 pub enum SubgroupCheck {
     // This is very expensive, each group element is multiplied by the order of the prime subgroup

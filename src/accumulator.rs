@@ -27,7 +27,7 @@ pub struct Parameters {
 }
 
 macro_rules! log {
-            ($($t:tt)*) => (web_sys::console::log_1(&format_args!($($t)*).to_string().into()))
+    ($($t:tt)*) => (web_sys::console::log_1(&format_args!($($t)*).to_string().into()))
 }
 
 impl Accumulator {
@@ -209,6 +209,7 @@ fn vandemonde_challenge(x: Fr, n: usize) -> Vec<Fr> {
 // Javascript entry point
 #[wasm_bindgen]
 pub fn contribute(points: Vec<u8>, g1_size: usize, g2_size: usize) -> Result<Vec<u8>, JsValue> {
+    console_error_panic_hook::set_once();
     log!("Init contribute");
 
 
