@@ -106,6 +106,10 @@ These are the actors who want to either check that their contributions were incl
     // If position is None/Nil then your contribution was not included. Else the position of your contribution will be returned.
 ````
 
+## Build for browser-based deployment
+
+wasm-pack build --targe no-modules
+
 ## License 
 
 This project is distributed under a dual license. (MIT/APACHE)
