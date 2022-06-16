@@ -3,6 +3,8 @@
 use ark_bls12_381::{Fr, G1Affine, G1Projective, G2Affine, G2Projective};
 use ark_ec::{AffineCurve, PairingEngine, ProjectiveCurve};
 use ark_ff::{Field, PrimeField, Zero};
+use std::fs::File;
+use std::io::Write;
 
 use crate::{keypair::PrivateKey, update_proof::UpdateProof, serialisation::SubgroupCheck};
 
@@ -209,19 +211,27 @@ fn vandemonde_challenge(x: Fr, n: usize) -> Vec<Fr> {
 pub fn contribute(points: Vec<u8>, g1_size: usize, g2_size: usize) -> Result<Vec<u8>, JsValue> {
     log!("Init contribute");
 
+
     // Put the JS parmeters into an Accumulator
     let params = Parameters {
             num_g1_elements_needed: g1_size,
             num_g2_elements_needed: g2_size,
     };
 
+    log!("g1_size: {:?}", g1_size);
+    log!("g2_size: {:?}", g2_size);
+
     let mut accumulator: Accumulator = Accumulator::deserialise(&points, params, SubgroupCheck::Partial);
+
+    log!("get entropy");
 
     let mut rng = &mut thread_rng();
     let priv_key = PrivateKey::rand(rng);
 
+    log!("update");
     let update_proof: UpdateProof = accumulator.update(priv_key);
 
+    log!("serialise");
     let mut update_bytes: Vec<u8> = accumulator.serialise();
 
     Ok(update_bytes)
@@ -277,4 +287,15 @@ fn acc_fuzz() {
         update_proof_2,
         update_proof_3,
     ]));
+}
+
+#[test]
+fn write_new() {
+
+    let num_coefficients: usize = 2usize.pow(16);
+    let acc = Accumulator::new_for_kzg(num_coefficients);
+    let bytes = acc.serialise();
+
+    let mut f = File::create("new_kzg.pot").unwrap();
+    f.write(&bytes).expect("unable to write params");
 }

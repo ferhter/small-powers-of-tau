@@ -110,6 +110,9 @@ These are the actors who want to either check that their contributions were incl
 
 wasm-pack build --targe no-modules
 
+The `pkg` folder will contain the necessary javascript and wasm modules
+to copy and run in a node.js app.
+
 ## License 
 
 This project is distributed under a dual license. (MIT/APACHE)
