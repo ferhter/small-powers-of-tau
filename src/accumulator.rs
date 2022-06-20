@@ -14,7 +14,7 @@ use js_sys;
 use web_sys;
 use console_error_panic_hook;
 use wasm_bindgen::prelude::*;
-pub use wasm_bindgen_rayon::init_thread_pool;
+//pub use wasm_bindgen_rayon::init_thread_pool;
 
 #[derive(Debug, Clone)]
 pub struct Accumulator {
@@ -82,7 +82,7 @@ impl Accumulator {
     // Inefficiently, updates the group elements using a users private key
     fn update_accumulator(&mut self, private_key: Fr) {
         use ark_ec::wnaf::WnafContext;
-        use rayon::prelude::*;
+        //use rayon::prelude::*;
 
         let max_number_elements = std::cmp::max(self.tau_g1.len(), self.tau_g2.len());
 
@@ -91,7 +91,7 @@ impl Accumulator {
         let wnaf = WnafContext::new(3);
 
         self.tau_g1
-            .par_iter_mut()
+            .iter_mut()
             .skip(1)
             .zip(&powers_of_priv_key)
             .for_each(|(tg1, priv_pow)| {
@@ -99,7 +99,7 @@ impl Accumulator {
             });
 
         self.tau_g2
-            .par_iter_mut()
+            .iter_mut()
             .skip(1)
             .zip(&powers_of_priv_key)
             .for_each(|(tg2, priv_pow)| {

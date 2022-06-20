@@ -93,12 +93,12 @@ impl Accumulator {
 
         if let SubgroupCheck::Full = subgroup_check {
             // TODO: swap this out by using the bowe endomorphism
-            g1.par_iter().for_each(|element| {
+            g1.iter().for_each(|element| {
                 if !element.is_in_correct_subgroup_assuming_on_curve() {
                     panic!("point is not in the prime subgroup")
                 }
             });
-            g2.par_iter().for_each(|element| {
+            g2.iter().for_each(|element| {
                 if !element.is_in_correct_subgroup_assuming_on_curve() {
                     panic!("point is not in the prime subgroup")
                 }

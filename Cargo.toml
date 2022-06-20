@@ -27,7 +27,7 @@ zeroize = { version = "*", features = ["zeroize_derive"] }
 
 # wasm
 wasm-bindgen = { version = "0.2.69" }
-wasm-bindgen-rayon = "1.0.3"
+##  wasm-bindgen-rayon = "1.0.3"
 js-sys = { version = "0.3.35" }
 web-sys = { version = "0.3.35", features = ["console"] }
 console_error_panic_hook = { version = "0.1.6" }
