@@ -26,7 +26,7 @@ ark-std = "^0.3.0"
 zeroize = { version = "*", features = ["zeroize_derive"] }
 
 # wasm
-wasm-bindgen = { version = "0.2.69" }
+wasm-bindgen = { version = "0.2.74" }
 wasm-bindgen-rayon = "1.0"
 js-sys = { version = "0.3.35" }
 web-sys = { version = "0.3.35", features = ["console"] }

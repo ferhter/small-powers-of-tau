@@ -92,9 +92,13 @@ impl Accumulator {
 
         self.tau_g1
             .par_iter_mut()
+            .enumerate()
             .skip(1)
             .zip(&powers_of_priv_key)
-            .for_each(|(tg1, priv_pow)| {
+            .for_each(|((i, tg1), priv_pow)| {
+                if (i % 1000) == 0 {
+                    log!("computing {:?}", i);
+                }
                 *tg1 = wnaf.mul(*tg1, priv_pow);
             });
 
