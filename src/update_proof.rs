@@ -36,7 +36,7 @@ impl UpdateProof {
         chain.verify()
     }
     // Returns commitment_to_secret (g2)
-    pub(crate) fn get_commitment_to_secret(&self) -> String {
+    pub fn get_commitment_to_secret(&self) -> String {
         let mut commitment = hex::encode(serialize_g2(&self.commitment_to_secret.into_affine()));
         commitment.insert_str(0, "0x");
         commitment
