@@ -144,7 +144,7 @@ pub struct SRSJson {
     #[serde(rename = "powersOfTau")]
     powers_of_tau: PowerOfTau,
     #[serde(rename = "potPubkey")]
-    pot_pubkey: String,
+    pub pot_pubkey: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

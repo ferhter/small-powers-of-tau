@@ -4,6 +4,8 @@
 
 use crate::shared_secret::SharedSecretChain;
 use ark_bls12_381::{G1Projective, G2Projective};
+use crate::interop_point_encoding::serialize_g2;
+use ark_ec::ProjectiveCurve;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct UpdateProof {
@@ -32,5 +34,11 @@ impl UpdateProof {
         }
 
         chain.verify()
+    }
+    // Returns commitment_to_secret (g2)
+    pub fn get_commitment_to_secret(&self) -> String {
+        let mut commitment = hex::encode(serialize_g2(&self.commitment_to_secret.into_affine()));
+        commitment.insert_str(0, "0x");
+        commitment
     }
 }
