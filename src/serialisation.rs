@@ -1,175 +1,188 @@
+use crate::interop_point_encoding::{
+    deserialize_g1, deserialize_g2, serialize_g1, serialize_g2, G1_SERIALISED_SIZE,
+    G2_SERIALISED_SIZE,
+};
+use serde::{Deserialize, Serialize};
+
 use crate::{
-    accumulator::{Accumulator, Parameters},
+    srs::{Parameters, SRS},
     update_proof::UpdateProof,
 };
-use ark_bls12_381::{G1Affine, G1Projective, G2Affine, G2Projective};
-use ark_ec::AffineCurve;
-use ark_ff::Zero;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use ark_bls12_381::{G1Projective, G2Projective};
+use ark_ec::{AffineCurve, ProjectiveCurve};
 
-// macro_rules! log {
-//     ($($t:tt)*) => (web_sys::console::log_1(&format_args!($($t)*).to_string().into()))
-// }
-
-// use js_sys;
-// use web_sys;
-// use console_error_panic_hook;
-
-
-// TODO: Once we specify how to deal with failure cases, make these methods return a Result
-pub enum SubgroupCheck {
-    // This is very expensive, each group element is multiplied by the order of the prime subgroup
-    // The result is checked to be the identity.
-    Full,
-    // Only the first group element is checked. This should only be done for participants of the ceremony.
-    Partial,
-}
-impl Accumulator {
-    pub fn serialise(&self) -> Vec<u8> {
-        let mut bytes = Vec::new();
-
-        for g1 in &self.tau_g1 {
-            g1.serialize_unchecked(&mut bytes).unwrap()
+fn hex_string_to_g1(hex_str: &str) -> Option<G1Projective> {
+    if let Some(stripped_point_json) = hex_str.strip_prefix("0x") {
+        let bytes = hex::decode(stripped_point_json).ok()?;
+        if bytes.len() != G1_SERIALISED_SIZE {
+            return None;
         }
-        for g2 in &self.tau_g2 {
-            g2.serialize_unchecked(&mut bytes).unwrap()
-        }
-
-        bytes
+        let mut fixed_array = [0u8; G1_SERIALISED_SIZE];
+        fixed_array.copy_from_slice(&bytes);
+        return Some(deserialize_g1(fixed_array)?.into_projective());
+    } else {
+        return None;
     }
-
-    // TODO: modify this method to return a result.
-    // TODO: what does a contributor do when they are given a zero element?
-    pub fn deserialise(
-        bytes: &[u8],
-        parameters: Parameters,
-        subgroup_check: SubgroupCheck,
-    ) -> Self {
-        // TODO: We need to deserialise into affine representation because arkworks does not have `is_on_curve` and `subgroup_check` for Projective representation
-        let mut g1 = vec![G1Affine::prime_subgroup_generator(); parameters.num_g1_elements_needed];
-        let mut g2 = vec![G2Affine::prime_subgroup_generator(); parameters.num_g2_elements_needed];
-
-        let mut reader = std::io::Cursor::new(bytes);
-
-        for element in g1.iter_mut() {
-            *element = CanonicalDeserialize::deserialize_unchecked(&mut reader).unwrap();
-            if element.is_zero() {
-                panic!("unexpected zero point")
-            }
+}
+fn hex_string_to_g2(hex_str: &str) -> Option<G2Projective> {
+    if let Some(stripped_point_json) = hex_str.strip_prefix("0x") {
+        let bytes = hex::decode(stripped_point_json).ok()?;
+        if bytes.len() != G2_SERIALISED_SIZE {
+            return None;
         }
-        for element in g2.iter_mut() {
-            *element = CanonicalDeserialize::deserialize_unchecked(&mut reader).unwrap();
-            if element.is_zero() {
-                panic!("unexpected zero point")
-            }
-        }
-        // Check if points are on the curve
-        for element in &g1 {
-            if !element.is_on_curve() {
-                panic!("point is not on curve")
-            }
-        }
-        for element in &g2 {
-            if !element.is_on_curve() {
-                panic!("point is not on curve")
-            }
-        }
-
-        // This method should be used by participants, we only check that one element is in the group
-        // then by induction and the structure of the SRS, the rest of the elements are in the group
-        //
-        // We actually make the check cheaper because we use the canonical generators,
-        // so its just an equals check
-        // TODO: write a proof for this -- assume it is unsafe
-        let first_g1_element = g1[0];
-        if first_g1_element != G1Affine::prime_subgroup_generator() {
-            panic!("first g1 element is not the canonical prime subgroup generator")
-        }
-        let first_g2_element = g2[0];
-        if first_g2_element != G2Affine::prime_subgroup_generator() {
-            panic!("first g2 element is not the canonical prime subgroup generator")
-        }
-
-        if let SubgroupCheck::Full = subgroup_check {
-            // TODO: swap this out by using the bowe endomorphism
-            g1.par_iter().for_each(|element| {
-                if !element.is_in_correct_subgroup_assuming_on_curve() {
-                    panic!("point is not in the prime subgroup")
-                }
-            });
-            g2.par_iter().for_each(|element| {
-                if !element.is_in_correct_subgroup_assuming_on_curve() {
-                    panic!("point is not in the prime subgroup")
-                }
-            });
-        }
-
-        Accumulator {
-            tau_g1: g1
-                .into_iter()
-                .map(|element| element.into_projective())
-                .collect(),
-            tau_g2: g2
-                .into_iter()
-                .map(|element| element.into_projective())
-                .collect(),
-        }
+        let mut fixed_array = [0u8; G2_SERIALISED_SIZE];
+        fixed_array.copy_from_slice(&bytes);
+        return Some(deserialize_g2(fixed_array)?.into_projective());
+    } else {
+        return None;
     }
 }
 
-impl PartialEq for UpdateProof {
-    fn eq(&self, other: &Self) -> bool {
-        self.commitment_to_secret == other.commitment_to_secret
-            && self.previous_accumulated_point == other.previous_accumulated_point
-            && self.new_accumulated_point == other.new_accumulated_point
+impl SRS {
+    pub fn serialise(&self) -> (Vec<String>, Vec<String>) {
+        self.to_json_array()
     }
-}
 
-impl PartialEq for Accumulator {
-    fn eq(&self, other: &Self) -> bool {
-        self.tau_g1 == other.tau_g1 && self.tau_g2 == other.tau_g2
+    fn g1s_to_json_array(g1s: &[G1Projective]) -> Vec<String> {
+        let mut g1_points_json = Vec::new();
+
+        let g1_points_affine = G1Projective::batch_normalization_into_affine(g1s);
+
+        for point in &g1_points_affine {
+            let mut point_as_hex = hex::encode(serialize_g1(point));
+            point_as_hex.insert_str(0, "0x");
+            g1_points_json.push(point_as_hex)
+        }
+
+        g1_points_json
+    }
+    fn g2s_to_json_array(g2s: &[G2Projective]) -> Vec<String> {
+        let mut g2_points_json = Vec::new();
+
+        let g2_points_affine = G2Projective::batch_normalization_into_affine(g2s);
+
+        for point in &g2_points_affine {
+            let mut point_as_hex = hex::encode(serialize_g2(point));
+            point_as_hex.insert_str(0, "0x");
+            g2_points_json.push(point_as_hex)
+        }
+
+        g2_points_json
+    }
+
+    fn to_json_array(&self) -> (Vec<String>, Vec<String>) {
+        let g1_points_json = Self::g1s_to_json_array(self.g1_elements());
+        let g2_points_json = Self::g2s_to_json_array(self.g2_elements());
+
+        (g1_points_json, g2_points_json)
+    }
+
+    // We do not check if the point is the identity when deserialising
+    // What we do check, is that every point is a point on the curve
+    pub fn deserialise(json_arr: (&[String], &[String]), parameters: Parameters) -> Option<Self> {
+        SRS::from_json_array(json_arr, parameters)
+    }
+
+    fn from_json_array(json_array: (&[String], &[String]), parameters: Parameters) -> Option<Self> {
+        let (g1_points_json_array, g2_points_json_array) = json_array;
+        let mut g1 = vec![];
+        let mut g2 = vec![];
+
+        for point_json in g1_points_json_array {
+            g1.push(hex_string_to_g1(&point_json)?);
+        }
+        for point_json in g2_points_json_array {
+            g2.push(hex_string_to_g2(&point_json)?)
+        }
+
+        if g1.len() != parameters.num_g1_elements_needed {
+            return None;
+        }
+        if g2.len() != parameters.num_g2_elements_needed {
+            return None;
+        }
+
+        SRS::from_vectors(g1, g2)
     }
 }
 
 impl UpdateProof {
-    pub fn serialise(&self) -> Vec<u8> {
-        let mut bytes = Vec::new();
-
-        self.commitment_to_secret
-            .serialize_uncompressed(&mut bytes)
-            .unwrap();
-        self.previous_accumulated_point
-            .serialize_uncompressed(&mut bytes)
-            .unwrap();
-        self.new_accumulated_point
-            .serialize_uncompressed(&mut bytes)
-            .unwrap();
-
-        bytes
+    pub fn serialise(&self) -> [String; 2] {
+        self.to_json_array()
     }
-    pub fn deserialise(bytes: &[u8]) -> Self {
-        let mut reader = std::io::Cursor::new(bytes);
 
-        let commitment_to_secret: G2Projective =
-            CanonicalDeserialize::deserialize_uncompressed(&mut reader).unwrap();
-        let previous_accumulated_point: G1Projective =
-            CanonicalDeserialize::deserialize_uncompressed(&mut reader).unwrap();
-        let new_accumulated_point: G1Projective =
-            CanonicalDeserialize::deserialize_uncompressed(&mut reader).unwrap();
+    fn to_json_array(&self) -> [String; 2] {
+        let mut a = hex::encode(serialize_g2(&self.commitment_to_secret.into_affine()));
+        a.insert_str(0, "0x");
 
-        assert!(!commitment_to_secret.is_zero());
-        assert!(!previous_accumulated_point.is_zero());
-        assert!(!new_accumulated_point.is_zero());
+        let mut b = hex::encode(serialize_g1(&self.new_accumulated_point.into_affine()));
+        b.insert_str(0, "0x");
 
-        UpdateProof {
+        [a, b]
+    }
+    pub fn deserialise(json_array: [String; 2]) -> Option<Self> {
+        UpdateProof::from_json_array(json_array)
+    }
+
+    fn from_json_array(points_json_arr: [String; 2]) -> Option<Self> {
+        let commitment_to_secret = hex_string_to_g2(&points_json_arr[0])?;
+        let new_accumulated_point = hex_string_to_g1(&points_json_arr[1])?;
+
+        Some(UpdateProof {
             commitment_to_secret,
-            previous_accumulated_point,
             new_accumulated_point,
-        }
+        })
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct SRSJson {
+    #[serde(rename = "numG1Powers")]
+    num_g1_powers: usize,
+    #[serde(rename = "numG2Powers")]
+    num_g2_powers: usize,
+    #[serde(rename = "powersOfTau")]
+    powers_of_tau: PowerOfTau,
+    #[serde(rename = "potPubkey")]
+    pub pot_pubkey: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct PowerOfTau {
+    #[serde(rename = "G1Powers")]
+    g1_powers: Vec<String>,
+    #[serde(rename = "G2Powers")]
+    g2_powers: Vec<String>,
+}
+
+impl From<&SRS> for SRSJson {
+    fn from(srs: &SRS) -> Self {
+        let g1s = srs.g1_elements();
+        let g2s = srs.g2_elements();
+
+        Self {
+            num_g1_powers: g1s.len(),
+            num_g2_powers: g2s.len(),
+            powers_of_tau: PowerOfTau {
+                g1_powers: SRS::g1s_to_json_array(g1s),
+                g2_powers: SRS::g2s_to_json_array(g2s)
+            },
+            pot_pubkey: SRS::g2s_to_json_array(g2s).get(0).unwrap().to_string(),
+        }
+    }
+}
+impl From<&SRSJson> for Option<SRS> {
+    fn from(srs: &SRSJson) -> Self {
+        let parameters = Parameters {
+            num_g1_elements_needed: srs.num_g1_powers,
+            num_g2_elements_needed: srs.num_g2_powers,
+        };
+        SRS::deserialise(
+            (&srs.powers_of_tau.g1_powers, &srs.powers_of_tau.g2_powers),
+            parameters,
+        )
+    }
+}
 #[cfg(test)]
 mod tests {
     use crate::keypair::PrivateKey;
@@ -183,32 +196,30 @@ mod tests {
         let proof = UpdateProof {
             commitment_to_secret: G2Projective::prime_subgroup_generator()
                 .mul(Fr::from(200u64).into_repr()),
-            previous_accumulated_point: G1Projective::prime_subgroup_generator()
-                .mul(Fr::from(888u64).into_repr()),
             new_accumulated_point: G1Projective::prime_subgroup_generator()
                 .mul(Fr::from(789u64).into_repr()),
         };
 
         let bytes = proof.serialise();
-        let deserialised_proof = UpdateProof::deserialise(&bytes);
+        let deserialised_proof = UpdateProof::deserialise(bytes).unwrap();
 
         assert_eq!(proof, deserialised_proof)
     }
 
     #[test]
-    fn accumulator_serialise_roundtrip() {
+    fn srs_serialise_roundtrip() {
         let params = Parameters {
             num_g1_elements_needed: 100,
             num_g2_elements_needed: 25,
         };
 
         let secret = PrivateKey::from_u64(5687);
-        let mut acc = Accumulator::new(params);
+        let mut acc = SRS::new(params).unwrap();
         acc.update(secret);
 
         let bytes = acc.serialise();
-        let deserialised_acc = Accumulator::deserialise(&bytes, params, SubgroupCheck::Full);
+        let deserialised_srs = SRS::deserialise((&bytes.0, &bytes.1), params).unwrap();
 
-        assert_eq!(acc, deserialised_acc);
+        assert_eq!(acc, deserialised_srs);
     }
 }
