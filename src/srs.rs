@@ -105,6 +105,7 @@ impl SRS {
             // Skip the degree-0 element as it does not get updated
             .skip(1)
             .zip(&powers_of_priv_key)
+            .into_par_iter()
             .for_each(|(tg1, priv_pow)| {
                 *tg1 = wnaf.mul(*tg1, priv_pow);
             });
@@ -113,6 +114,7 @@ impl SRS {
             // Skip the degree-0 element as it does not get updated
             .skip(1)
             .zip(&powers_of_priv_key)
+            .into_par_iter()
             .for_each(|(tg2, priv_pow)| {
                 *tg2 = wnaf.mul(*tg2, priv_pow);
             })
